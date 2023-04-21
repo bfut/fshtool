@@ -6,7 +6,7 @@
  http://www.math.polytechnique.fr/cmat/auroux/nfs/
  http://auroux.free.fr/nfs/
 
- This is free software. It is distributed under the terms of the 
+ This is free software. It is distributed under the terms of the
  GNU General Public License.
  Distributing this software without its source code is illegal.
 
@@ -25,13 +25,13 @@
  - bug fix for global palettes
 
  CHANGES in v1.10 since v1.00:
- 
+
  - extract 256-color bitmap alpha channels to ALPHA8.DAT text file
  - lost alpha-channel data in 256-color BMPs is read from ALPHA8.DAT
    or defaults to white.
 
  CHANGES since QFS Suite:
- 
+
  - integrated everything into one single program
  - eliminated intermediary FSH step
  - Linux portability
@@ -42,12 +42,12 @@
  - extracts alpha layer when present
  - SHPI.DAT has been replaced by human-readable INDEX.FSH
    (modify only with great care !)
- 
+
  ************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
+/* #include <malloc.h> Linux-specific and redundant to stdlib.h */
 #include <string.h>
 
 /* Windows compatibility */
@@ -67,7 +67,7 @@ typedef struct FSH_HDR {  /* header of a FSH file */
   int nbmp;
   char dirId[4];
 } FSH_HDR;
-    
+
 typedef struct BMPDIR {
   char name[4];
   int ofs;
@@ -108,14 +108,14 @@ void usage()
 void abort()
 {
     printf("\nUnsuccessful termination. See README.TXT for more details.\n");
-    printf("Press Enter to exit.\n"); getchar();
+    /* printf("Press Enter to exit.\n"); getchar(); */
     exit(0);
 }
 
 void sanity_check() /* make sure we haven't used a braindead compiler */
 {
   int x;
-  
+
    if (sizeof(int)!=4) { printf("Problem: int is not 32-bit\n"); abort(); }
    if (sizeof(short)!=2) { printf("Problem: short is not 16-bit\n"); abort(); }
    if ((sizeof(struct BMPHEAD)!=52)||(sizeof(struct FSH_HDR)!=16)||
@@ -188,24 +188,24 @@ unsigned char *uncompress_data(unsigned char *inbuf,int *buflen)
   unsigned char packcode;
   int a,b,c,len,offset;
   int inlen,outlen,inpos,outpos;
-  
+
   /* length of data */
   inlen=*buflen;
   outlen=(inbuf[2]<<16)+(inbuf[3]<<8)+inbuf[4];
   outbuf=malloc(outlen);
   if (outbuf==NULL) { printf("Insufficient memory.\n"); abort(); }
-  
+
   /* position in file */
   if (inbuf[0]&0x01) inpos=8; else inpos=5;
   outpos=0;
-  
+
   /* main decoding loop */
   while ((inpos<inlen)&&(inbuf[inpos]<0xFC))
   {
     packcode=inbuf[inpos];
     a=inbuf[inpos+1];
     b=inbuf[inpos+2];
-    
+
     if (!(packcode&0x80)) {
       len=packcode&3;
       mmemcpy(outbuf+outpos,inbuf+inpos+2,len);
@@ -217,7 +217,7 @@ unsigned char *uncompress_data(unsigned char *inbuf,int *buflen)
       outpos+=len;
     }
     else if (!(packcode&0x40)) {
-      len=(a>>6)&3; 
+      len=(a>>6)&3;
       mmemcpy(outbuf+outpos,inbuf+inpos+3,len);
       inpos+=len+3;
       outpos+=len;
@@ -225,10 +225,10 @@ unsigned char *uncompress_data(unsigned char *inbuf,int *buflen)
       offset=(a&0x3f)*256+b+1;
       mmemcpy(outbuf+outpos,outbuf+outpos-offset,len);
       outpos+=len;
-    }  
+    }
     else if (!(packcode&0x20)) {
       c=inbuf[inpos+3];
-      len=packcode&3; 
+      len=packcode&3;
       mmemcpy(outbuf+outpos,inbuf+inpos+4,len);
       inpos+=len+4;
       outpos+=len;
@@ -236,7 +236,7 @@ unsigned char *uncompress_data(unsigned char *inbuf,int *buflen)
       offset=((packcode&0x10)<<12)+256*a+b+1;
       mmemcpy(outbuf+outpos,outbuf+outpos-offset,len);
       outpos+=len;
-    }  
+    }
     else {
       len=(packcode&0x1f)*4+4;
       mmemcpy(outbuf+outpos,inbuf+inpos+1,len);
@@ -244,13 +244,13 @@ unsigned char *uncompress_data(unsigned char *inbuf,int *buflen)
       outpos+=len;
     }
   }
-  
+
   /* trailing bytes */
   if ((inpos<inlen)&&(outpos<outlen)) {
     mmemcpy(outbuf+outpos,inbuf+inpos+1,inbuf[inpos]&3);
     outpos+=inbuf[inpos]&3;
   }
-  
+
   if (outpos!=outlen) printf("Warning: bad length ? %d instead of %d\n",outpos,outlen);
   *buflen=outlen;
   return outbuf;
@@ -271,26 +271,26 @@ void compress_data(unsigned char *inbuf,int *buflen,unsigned char *outbuf)
   int offs,len,bestoffs,bestlen,lastwrot,i;
   int inpos,inlen,outpos;
   int *x;
-  
+
   inlen=*buflen;
   inpos=0;
   inrd=inbuf;
   rev_similar=(int *)malloc(4*WINDOW_LEN);
   rev_last=(int **)malloc(256*sizeof(int *));
   if (rev_last) rev_last[0]=(int *)malloc(65536*4);
-  
+
   if ((outbuf==NULL)||(rev_similar==NULL)||
       (rev_last==NULL)||(rev_last[0]==NULL))
     { printf("Insufficient memory.\n"); abort(); }
   for (i=1;i<256;i++) rev_last[i]=rev_last[i-1]+256;
   memset(rev_last[0],0xff,65536*4);
   memset(rev_similar,0xff,4*WINDOW_LEN);
-  
+
   outbuf[0]=0x10; outbuf[1]=0xFB;
   outbuf[2]=inlen>>16; outbuf[3]=(inlen>>8)&255; outbuf[4]=inlen&255;
   outpos=5;
   lastwrot=0;
-  
+
   /* main encoding loop */
   for (inpos=0,inrd=inbuf;inpos<inlen;inpos++,inrd++) {
     if ((inpos&0x3fff)==0) { putchar('.'); fflush(stdout); }
@@ -309,7 +309,7 @@ void compress_data(unsigned char *inbuf,int *buflen,unsigned char *outbuf)
       if (len>bestlen) { bestlen=len; bestoffs=inpos-offs; }
       offs=rev_similar[offs&WINDOW_MASK];
     }
-    
+
     /* check if redundancy is good enough */
     if (bestlen>inlen-inpos) bestlen=inpos-inlen;
     if (bestlen<=2) bestlen=0;
@@ -352,7 +352,7 @@ void compress_data(unsigned char *inbuf,int *buflen,unsigned char *outbuf)
       }
     }
   }
-  
+
   /* end stuff */
   inpos=inlen;
   while (inpos-lastwrot>=4) {
@@ -382,7 +382,7 @@ void makepal(unsigned char *pos,int *len,int *pal)
   struct ENTRYHDR *hdr;
   unsigned char *ptr;
   unsigned short *p16;
-  
+
   memset(pal,0,1024);
   ptr=pos+16;
   hdr=(struct ENTRYHDR *)pos;
@@ -410,7 +410,7 @@ void makepal(unsigned char *pos,int *len,int *pal)
     memcpy(pal,ptr,4*(*len));
   }
   else { printf("Unknown palette format.\n"); abort(); }
-}    
+}
 
 /* write a line of alpha channel data text */
 
@@ -438,17 +438,17 @@ void unpack_dxt(unsigned char mask, unsigned short col1, unsigned short col2,
   unsigned short r1,g1,b1,r2,g2,b2;
   r1=8*(col1&31);  g1=4*((col1>>5)&63);  b1=8*(col1>>11);
   r2=8*(col2&31);  g2=4*((col2>>5)&63);  b2=8*(col2>>11);
-  
+
   switch (mask) {
     case 0: target[0]=r1; target[1]=g1; target[2]=b1; break;
     case 1: target[0]=r2; target[1]=g2; target[2]=b2; break;
-    case 2: 
+    case 2:
       if (col1>col2) {
         target[0]=(2*r1+r2)/3; target[1]=(2*g1+g2)/3; target[2]=(2*b1+b2)/3;
       } else {
         target[0]=(r1+r2)/2; target[1]=(g1+g2)/2; target[2]=(b1+b2)/2;
       } break;
-    case 3: 
+    case 3:
       if (col1>col2) {
         target[0]=(r1+2*r2)/3; target[1]=(g1+2*g2)/3; target[2]=(b1+2*b2)/3;
       } else {
@@ -465,7 +465,7 @@ int score_dxt(unsigned long *px, int nstep, unsigned long col1,
   unsigned char *p1,*p2,*p;
   int vec[3],vdir[3],v2,xa2,xav;
   int i,score,choice;
-  
+
   p1 = (unsigned char *)&col1;
   p2 = (unsigned char *)&col2;
   vdir[0] = (int)p2[0] - (int)p1[0];
@@ -500,7 +500,7 @@ void pack_dxt(unsigned long *px, unsigned char *dest)
   unsigned char *c1, *c2;
   unsigned short *sptr, tmpshort;
 /* int minc1, minc2, maxc1, maxc2, cc1, cc2, step, channel; */
-  
+
   /* mark duplicate colors */
   ncolors=0;
   for (i1=0;i1<16;i1++) {
@@ -508,7 +508,7 @@ void pack_dxt(unsigned long *px, unsigned char *dest)
     for (i2=0;i2<ncolors;i2++) if (uniq[i2]==col1) break;
     if (i2==ncolors) uniq[ncolors++] = col1;
   }
-  
+
   /* optimize over pairs of colors */
   if (ncolors == 1) {
     best_col1 = uniq[0]; best_col2 = uniq[0]; best_err = 1000; best_ninter = 3;
@@ -517,15 +517,15 @@ void pack_dxt(unsigned long *px, unsigned char *dest)
     for (i1=0; i1<ncolors-1; i1++)
       for (i2=i1+1; i2<ncolors; i2++) {
         err = score_dxt(px, 2, uniq[i1], uniq[i2], &pack);
-        if (err < best_err) 
+        if (err < best_err)
           { best_col1 = uniq[i1]; best_col2 = uniq[i2]; best_ninter = 2; best_err = err; }
         err = score_dxt(px, 3, uniq[i1], uniq[i2], &pack);
-        if (err < best_err) 
+        if (err < best_err)
           { best_col1 = uniq[i1]; best_col2 = uniq[i2]; best_ninter = 3; best_err = err; }
       }
   }
   c1 = (unsigned char *)&col1; c2 = (unsigned char *)&col2;
-  
+
   /* fudge the pair of colors */
 /*
   if (best_err > 0)
@@ -538,9 +538,9 @@ void pack_dxt(unsigned long *px, unsigned char *dest)
       if (minc2 >= 8) minc2-=8; else minc2=0;
       if (maxc1 <= 244) maxc1+=8; else maxc1=252;
       if (maxc2 <= 244) maxc2+=8; else maxc2=252;
-      for (c1[channel] = cc1 = minc1; 
+      for (c1[channel] = cc1 = minc1;
              cc1 <= maxc1; c1[channel]+=step, cc1+=step)
-        for (c2[channel] = cc2 = minc2; 
+        for (c2[channel] = cc2 = minc2;
              cc2 <= maxc2; c2[channel]+=step, cc2+=step) {
           err = score_dxt(px, best_ninter, col1, col2, &pack);
           if (err < best_err)
@@ -549,7 +549,7 @@ void pack_dxt(unsigned long *px, unsigned char *dest)
     }
 */
   col1 = best_col1; col2 = best_col2;
-  
+
   /* finally compress */
   sptr = (unsigned short *)dest;
   sptr[0] = ((unsigned short)c1[0]>>3) + (((unsigned short)c1[1]>>2) << 5)
@@ -577,7 +577,7 @@ void fsh_to_bmp(char *fshname)
   struct ENTRYHDR *hdr,*auxhdr,*palhdr;
   struct BMPHEAD bmphdr;
   unsigned char pad[32768],*ptr,*bmpptr;
-  
+
   fshhdr=(struct FSH_HDR *)inbuf;
   dir=(struct BMPDIR *)(inbuf+16);
   log=fopen("index.fsh","wt");
@@ -591,12 +591,12 @@ void fsh_to_bmp(char *fshname)
   quotify(fshhdr->dirId,4,pad+strlen(pad));
   puts(pad);
   fprintf(log,"%s\n",pad);
-  
+
   if (inlen<200000) i=4*inlen;
   else if (inlen<500000) i=2*inlen;
   else i=inlen+500000;
   fprintf(log,"BUFSZ %d\n",i); /* buffer alloc size for file recomposition */
-  
+
   /* look for a global palette */
   j=-1; hasglobpal=0;
   for (i=0;i<nbmp;i++) if (!hasglobpal) {
@@ -622,25 +622,25 @@ void fsh_to_bmp(char *fshname)
   for (i=0;i<nbmp;i++) if (dir[i].ofs<j) j=dir[i].ofs;
   if (j>16+8*nbmp) {
     fprintf(log,"!PAD %d ",j-16-8*nbmp);
-    hexify(inbuf+16+8*nbmp,j-16-8*nbmp,pad);
+    hexify(inbuf+16+8*nbmp,j-16-8*nbmp,pad); /**/ printf("!PAD %d ",j-16-8*nbmp);  printf("? %s\n",pad);
     fprintf(log,"%s\n",pad);
-  }
-  
+  } /**/ printf("j%d ?? _%d\n",j, 16+8*nbmp);
+
   /* main loop */
   for (i=0;i<nbmp;i++) {
     offs=dir[i].ofs;
     /* offset of the following entry ? */
     nxoffs=fshhdr->filesize;
-    for (j=0;j<nbmp;j++) 
+    for (j=0;j<nbmp;j++)
       if ((dir[j].ofs<nxoffs)&&(dir[j].ofs>offs)) nxoffs=dir[j].ofs;
     if (((i==nbmp-1)&&(nxoffs!=fshhdr->filesize)) ||
         ((i<nbmp-1)&&(nxoffs!=dir[i+1].ofs))) {
       printf("WARNING: FSH bitmaps are not correctly ordered.\n"
  "The reverse conversion from .BMP to .FSH/.QFS may give a corrupted file.\n");
       printf("Press Enter to continue.\n");
-      getchar();
+      /* getchar(); */
     }
-    
+
     /* understand the attachment structure */
     hdr=(struct ENTRYHDR *)(inbuf+offs);
     j=hdr->code&0x7f;
@@ -663,7 +663,7 @@ void fsh_to_bmp(char *fshname)
          if ((j==0x22)||(j==0x24)||(j==0x2D)||(j==0x2A)||(j==0x29))
            { palhdr=auxhdr; paloffs=auxoffs; }
       }
-      
+
       numscales=0;
       if (!compressed) { /* look for multiscale NFS5 bitmaps ? */
         if ((hdr->misc[3]&0x0fff)==0) numscales=(hdr->misc[3]>>12)&0x0f;
@@ -701,12 +701,12 @@ void fsh_to_bmp(char *fshname)
         }
       }
     }
-    
+
     /* name things */
     quotify(dir[i].name,4,pad);
     printf("'%s' [%02X] -> ",pad,hdr->code&0xff);
     fprintf(log,"%s ",pad);
-    
+
     if (isbmp) {
       l=numscales;
       curoffs=offs+16;
@@ -730,7 +730,7 @@ void fsh_to_bmp(char *fshname)
           i,numscales,hdr->width,hdr->height);
         fprintf(log,"%04d-%%d.BMP\n",i);
         if (nattach)
-          fprintf(log,"MB%c+%d %02X x%d %d %d {%d %d %d}\n", 
+          fprintf(log,"MB%c+%d %02X x%d %d %d {%d %d %d}\n",
             packed_mbp?'Q':'P', nattach,
             hdr->code&0xff,numscales,hdr->width,hdr->height,
             hdr->misc[0],hdr->misc[1],hdr->misc[2]);
@@ -740,13 +740,13 @@ void fsh_to_bmp(char *fshname)
             hdr->code&0xff,numscales,hdr->width,hdr->height,
             hdr->misc[0],hdr->misc[1],hdr->misc[2]);
       }
-     
+
      while (l>=0) {
       if (numscales) sprintf(pad,"%04d-%d.BMP",i,l);
       else sprintf(pad,"%04d.BMP",i);
       bmp=fopen(pad,"wb");
       if (bmp==NULL) { printf("Unable to create file.\n"); abort(); }
-      
+
       /* prepare a BMP header */
       fputc('B',bmp);
       fputc('M',bmp);
@@ -761,12 +761,12 @@ void fsh_to_bmp(char *fshname)
           ((hdr->code&0x7f)==0x6D)||((hdr->code&0x7f)==0x61)) {
         if (numscales) sprintf(pad,"%04d-%da.BMP",i,l);
         else sprintf(pad,"%04d-a.BMP",i);
-        if (l==numscales) { /* only the first time */ 
+        if (l==numscales) { /* only the first time */
           if (numscales) fprintf(log,"alpha %04d-%%da.BMP\n",i);
           else fprintf(log,"alpha %s\n",pad);
           printf(" (alpha: %s) ",pad);
         }
-        
+
         alpha=fopen(pad,"wb");
         if (alpha==NULL) { printf("Unable to create file.\n"); abort(); }
         fputc('B',alpha);
@@ -780,7 +780,7 @@ void fsh_to_bmp(char *fshname)
         bmphdr.imsz=bmpw*hdr->height;
         fwrite(&bmphdr,sizeof(bmphdr),1,alpha);
       }
-      
+
       if ((hdr->code&0x7f)==0x7B) { /* 8-bit bitmap */
         if (l==numscales) printf("8 bit ");
         if (palhdr!=NULL) {
@@ -791,7 +791,7 @@ void fsh_to_bmp(char *fshname)
           else sprintf(pad,"%04d.BMP",i);
           if (!makealpha8(&alpha8,pad,locpal))
             if (l==numscales) printf("Couldn't write alpha channel data !\n");
-        } 
+        }
         else if (hasglobpal>=0) {
           memcpy(locpal,globpal,1024);
           locpallen=globpallen;
@@ -802,7 +802,7 @@ void fsh_to_bmp(char *fshname)
           if (l==numscales) printf("(NO PALETTE !)\n");
           locpallen=0;
         }
-        
+
         bmpw=hdr->width;
         while (bmpw&3) bmpw++;
         bmphdr.size=54+4*256+bmpw*hdr->height;
@@ -818,7 +818,7 @@ void fsh_to_bmp(char *fshname)
       else
       if ((hdr->code&0x7f)==0x7D) { /* 32-bit bitmap */
         if (l==numscales) printf("32 bit (8:8:8:8)\n");
-        
+
         for (k=0;k<256;k++) locpal[k]=k*0x01010101;
         fwrite(locpal,1,1024,alpha);
         for (k=hdr->height-1;k>=0;k--) {
@@ -827,7 +827,7 @@ void fsh_to_bmp(char *fshname)
           fwrite(pad,1,bmpw,alpha);
         }
         fclose(alpha);
-        
+
         bmpw=3*hdr->width;
         while (bmpw&3) bmpw++;
         bmphdr.size=54+bmpw*hdr->height;
@@ -837,7 +837,7 @@ void fsh_to_bmp(char *fshname)
         fwrite(&bmphdr,sizeof(bmphdr),1,bmp);
         for (k=hdr->height-1;k>=0;k--) {
           ptr=bmpptr+curoffs+4*k*hdr->width;
-          for (j=0;j<hdr->width;j++) 
+          for (j=0;j<hdr->width;j++)
            { pad[3*j]=ptr[4*j]; pad[3*j+1]=ptr[4*j+1]; pad[3*j+2]=ptr[4*j+2]; }
           fwrite(pad,1,bmpw,bmp);
         }
@@ -871,7 +871,7 @@ void fsh_to_bmp(char *fshname)
           fwrite(pad,1,bmpw,alpha);
         }
         fclose(alpha);
-        
+
         bmpw=3*hdr->width;
         while (bmpw&3) bmpw++;
         bmphdr.size=54+bmpw*hdr->height;
@@ -924,7 +924,7 @@ void fsh_to_bmp(char *fshname)
           fwrite(pad,1,bmpw,alpha);
         }
         fclose(alpha);
-        
+
         bmpw=3*hdr->width;
         while (bmpw&3) bmpw++;
         bmphdr.size=54+bmpw*hdr->height;
@@ -935,8 +935,8 @@ void fsh_to_bmp(char *fshname)
         for (k=hdr->height-1;k>=0;k--) {
           ptr=bmpptr+curoffs+2*k*hdr->width;
           for (j=0;j<hdr->width;j++) {
-            pad[3*j]=0x11*(ptr[2*j]&15); 
-            pad[3*j+1]=0x11*(ptr[2*j]>>4); 
+            pad[3*j]=0x11*(ptr[2*j]&15);
+            pad[3*j+1]=0x11*(ptr[2*j]>>4);
             pad[3*j+2]=0x11*(ptr[2*j+1]&15);
           }
           fwrite(pad,1,bmpw,bmp);
@@ -1011,7 +1011,7 @@ void fsh_to_bmp(char *fshname)
         curoffs+=hdr->width*hdr->height/2;
       }
       fclose(bmp);
-      
+
       if (numscales) { /* multiscale loop */
         hdr->width/=2;
         hdr->height/=2;
@@ -1025,13 +1025,13 @@ void fsh_to_bmp(char *fshname)
       }
       l--;
     }
-    
+
       if (compressed) {
         free(bmpptr);
         if (hdr->code>>8) curoffs=offs+(hdr->code>>8);
         else curoffs=nxoffs;
       }
-      
+
       /* now, look at the attachments if any */
       auxhdr=hdr; auxoffs=offs;
       if (nattach>0) printf("  (attached:");
@@ -1093,7 +1093,7 @@ void fsh_to_bmp(char *fshname)
         }
       }
       if (nattach>0) printf(")\n");
-      
+
       if (curoffs<nxoffs) {
         fprintf(log,"!PAD %d ",nxoffs-curoffs);
         hexify(inbuf+curoffs,nxoffs-curoffs,pad);
@@ -1102,7 +1102,7 @@ void fsh_to_bmp(char *fshname)
       if (curoffs>nxoffs) {
         printf("WARNING: passed the next block ?\n");
         printf("Press Enter to continue.\n");
-        getchar();
+        /* getchar(); */
       }
     }
     else {
@@ -1123,7 +1123,7 @@ void fsh_to_bmp(char *fshname)
       fclose(bmp);
     }
   }
-  
+
   fprintf(log,"#END\n");
   fclose(log);
   if (alpha8!=NULL) fclose(alpha8);
@@ -1135,7 +1135,7 @@ char *next_lf(char *p)
   while ((*p!='\n')&&(*p!=0)) { if (*p=='\r') *p=0; p++; }
   if (*p==0) { printf("Truncated INDEX.FSH\n"); abort(); }
   *p=0;
-  p++; 
+  p++;
   if (*p=='\r') p++;
   return p;
 }
@@ -1172,11 +1172,11 @@ void alpha8_fix_locpal(char *fname,char *alpha8,int *locpal)
   unsigned char alpha[256], *lp;
   char *p;
   int i;
-  
+
   for (i=0;i<256;i++) if (locpal[i]&0xff000000) return; /* no need to fix */
   for (i=0;i<256;i++) alpha[i]=0xff;
   p=strstr(alpha8, fname);
-  if (p!=NULL) 
+  if (p!=NULL)
     while (*(p++)!='\n') if (*p==0) break;
   if (p==NULL || *p==0) {
     printf("(setting alpha to white)\n");
@@ -1199,7 +1199,7 @@ void bmp_get_file(char *bmpname,unsigned char code,int width,int height,
   unsigned char *pix,*bmp,*src,*tgt;
   unsigned long dxt_px[16];
   int i,j,k,l,bmpsz,bmpw;
-  
+
   /* sanity checks */
   map_file(bmpname,&bmp,&bmpsz);
   if ((bmp[0]!='B')||(bmp[1]!='M'))
@@ -1212,7 +1212,7 @@ void bmp_get_file(char *bmpname,unsigned char code,int width,int height,
         bmphdr->wid,bmphdr->hei,width,height);
       abort(); }
   pix=bmp+bmphdr->ofsbmp;
-  
+
   /* 8-bit */
   if (code==0x7B) {
     *data=malloc(width*height+2048);
@@ -1322,7 +1322,7 @@ void bmp_get_alpha(char *bmpname,unsigned char code,int width,int height,
   unsigned int *pal;
   unsigned char *pix,*bmp,*src,*tgt;
   int i,j,k,bmpsz,bmpw,warn;
-  
+
   /* sanity checks */
   map_file(bmpname,&bmp,&bmpsz);
   if ((bmp[0]!='B')||(bmp[1]!='M'))
@@ -1334,22 +1334,23 @@ void bmp_get_alpha(char *bmpname,unsigned char code,int width,int height,
     { printf("Incorrect geometry (%dx%d instead of %dx%d)\n",
         bmphdr->wid,bmphdr->hei,width,height);
       abort(); }
-  if (bmphdr->bpp!=8) { printf("Alpha channel is not a 8-bit BMP !\n"); abort(); }
-  
+  if (bmphdr->bpp!=8) { printf("Alpha channel is not a 8-bit BMP !"); /*abort();*/ printf(" %d\n", bmphdr->bpp); }
+
   pix=bmp+bmphdr->ofsbmp;
   pal=(unsigned int *)(bmp+54);
   warn=0;
-  for (i=0;i<256;i++) 
+  for (i=0;i<256;i++)
     if ((pal[i]&0xffffff)%0x010101!=0) warn=1;
   if (warn) {
     printf("WARNING: color palette is not grayscale in alpha channel bitmap.\n");
     printf("         Keeping blue component.\n");
     printf("Press Enter to continue.\n");
-    getchar();
+    /* getchar(); */
   }
   bmpw=width;
   while (bmpw&3) bmpw++;
-  
+
+  printf("code==0x%X\n", code);
   if (code==0x7D) { /* 32 bit */
     for (i=0;i<height;i++) {
       src=pix+(height-1-i)*bmpw;
@@ -1389,7 +1390,7 @@ void bmp_get_alpha(char *bmpname,unsigned char code,int width,int height,
       }
   }
   else { printf("Unknown FSH data type.\n"); abort(); }
-  
+
   free(bmp);
 }
 
@@ -1397,7 +1398,7 @@ int make_nfs_pal(int code,int len,unsigned char *dest,unsigned int *src)
 {
   int i;
   unsigned short *d;
-  
+
   d=(unsigned short *)dest;
   if (code==0x24) {
     for (i=0;i<len;i++) {
@@ -1449,7 +1450,7 @@ char *read_alpha8()
   char *buf;
   FILE *f;
   int len;
-  
+
   f=fopen("alpha8.dat","rt");
   if (f==NULL) {
     printf("No alpha data file.\n");
@@ -1483,25 +1484,25 @@ unsigned char *bmp_to_fsh()
   int globpal[256],locpal[256];
   char tmpfilename[1024];
 
-  
+
   alpha8=read_alpha8();
-  
+
   inbuf[inlen]=0; /* to be safe */
   linecount=0;
   /* header line */
   log=next_lf(inbuf);
-  
+
   /* fsh file name */
   nxline=next_lf(log);
   fshname=strdup(log);
   log=nxline;
-  
+
   /* compressed ? */
   if (!strncmp(log,"FSH",3)) iscompr=0;
   else if (!strncmp(log,"QFS",3)) iscompr=1;
   else idxerr();
   log=next_lf(log);
-  
+
   /* shpi header */
   if (strncmp(log,"SHPI ",5)) idxerr();
   memcpy(tmphdr.SHPI,"SHPI",4);
@@ -1510,7 +1511,7 @@ unsigned char *bmp_to_fsh()
   if (strncmp(ptr," objects, tag ",14)) idxerr();
   tmphdr.nbmp=nbmp;
   unquotify(ptr+14,4,tmphdr.dirId);
-  
+
   /* buffer size */
   log=next_lf(log);
   if (strncmp(log,"BUFSZ ",6)) idxerr();
@@ -1524,7 +1525,7 @@ unsigned char *bmp_to_fsh()
   dir=(struct BMPDIR *)(outbuf+16);
   fshlen=16+8*nbmp;
   outptr=outbuf+fshlen;
-  
+
   /* global palette */
   log=next_lf(log);
   nxline=next_lf(log);
@@ -1538,7 +1539,7 @@ unsigned char *bmp_to_fsh()
     free(data);
   }
   log=nxline;
-  
+
   /* main loop */
   for (i=0;i<=nbmp;i++) {
     /* possible padding */
@@ -1551,10 +1552,10 @@ unsigned char *bmp_to_fsh()
       }
       log=next_lf(log);
     }
-    
+
     /* end of list */
     if (!strncmp(log,"#END",4)) {
-      if (i!=nbmp) { 
+      if (i!=nbmp) {
         printf("Insufficiently many objects listed (%d vs. %d)\n",i,nbmp);
         idxerr();
       }
@@ -1564,7 +1565,7 @@ unsigned char *bmp_to_fsh()
       printf("End of file not found after all %d objects were added\n",nbmp);
       idxerr();
     }
-    
+
     /* object name & file name */
     unquotify(log,4,dir[i].name);
     dir[i].ofs=fshlen;
@@ -1573,7 +1574,7 @@ unsigned char *bmp_to_fsh()
     log=next_lf(log);
     printf("Adding %s\n",bmpname);
     isplainbmp=0;
-    
+
     /* BIN case */
     if (!strncmp(log,"BIN",3)) {
       map_file(bmpname,&data,&datalen);
@@ -1585,7 +1586,7 @@ unsigned char *bmp_to_fsh()
       log=next_lf(log);
       continue; /* next object */
     }
-    
+
     /* BMP case */
     if (!strncmp(log,"BMP ",4)) {
       hdr=(struct ENTRYHDR *)outptr;
@@ -1614,11 +1615,11 @@ unsigned char *bmp_to_fsh()
       }
       outptr+=16;
       fshlen+=16;
-      
+
       /* compress the bitmap if necessary */
       if (fshlen+datalen>allocsz-2000) outmem();
-      if (hdr->code&0x80) { 
-        compress_data(data,&datalen,outptr); 
+      if (hdr->code&0x80) {
+        compress_data(data,&datalen,outptr);
         printf("\n");
       }
       else memcpy(outptr,data,datalen);
@@ -1629,7 +1630,7 @@ unsigned char *bmp_to_fsh()
       isplainbmp=1; /* we'll do a palette check when done with attachments */
     }
     else
-    /* multiscale bitmaps */    
+    /* multiscale bitmaps */
     if (!strncmp(log,"MBP ",4) || !strncmp(log,"MBP+",4) ||
         !strncmp(log,"MBQ ",4) || !strncmp(log,"MBQ+",4)) {
       packed_mbp = log[2]-'P';
@@ -1674,8 +1675,8 @@ unsigned char *bmp_to_fsh()
           sprintf(tmpfilename,alphaname,scl);
           bmp_get_alpha(tmpfilename,hdr->code&0xff,xsz,ysz,data);
         }
-      
-        if (hdr->code&0x80) { 
+
+        if (hdr->code&0x80) {
           printf("Compressed multiscale bitmaps not allowed\n");
           idxerr();
         }
@@ -1693,7 +1694,7 @@ unsigned char *bmp_to_fsh()
       datalen=totdatalen;
     }
     else idxerr(); /* unknown object */
-    
+
     /* ATTACHMENT HANDLING LOOP */
     auxhdr=hdr;
     while (nattach>0) {
@@ -1711,7 +1712,7 @@ unsigned char *bmp_to_fsh()
       /* attach link */
       auxhdr->code=(auxhdr->code&0xff)+(datalen<<8);
       auxhdr=(struct ENTRYHDR *)outptr;
-      
+
       if (!strncmp(log,"PAL ",4)) {
         /* palette */
         auxhdr->code=0;
@@ -1779,8 +1780,8 @@ unsigned char *bmp_to_fsh()
       fshlen+=datalen;
       nattach--;
     }
-    
-    if (isplainbmp) {      
+
+    if (isplainbmp) {
       /* palette check for BMPs */
       if ((hdr->code&0x7f)==0x7B) {
         warn=0;
@@ -1797,24 +1798,24 @@ unsigned char *bmp_to_fsh()
         if (warn) {
           printf("WARNING: bitmap contains more colors than its palette !!!\n");
           printf("Press Enter to continue.\n");
-          getchar();
+          /* getchar(); */
         }
         warn=0;
         if (hasglobpal&&(locpallen<0)) {
-          for (j=0;j<globpallen;j++) 
+          for (j=0;j<globpallen;j++)
             if ((locpal[j]&0xffffff)!=(globpal[j]&0xffffff)) warn=1;
         }
         if (warn) {
           printf("WARNING: bitmap palette differs from the global palette !!!\n");
           printf("Press Enter to continue.\n");
-          getchar();
+          /* getchar(); */
         }
       }
       free(data);
     }
 
   }
-  
+
   fshhdr->filesize=fshlen;
   return outbuf;
 }
@@ -1824,8 +1825,8 @@ int main(int argc,char **argv)
   FILE *f;
   char *outfn,*p;
   unsigned char *tmpbuf;
-  int i,j,choice;
-  
+  int i/*,j,choice */;
+
   printf("===========================================================================\n");
   printf("FSHTOOL version 1.22 - (c) Denis Auroux 2002 - auroux@math.polytechnique.fr\n");
   printf("===========================================================================\n");
@@ -1834,14 +1835,14 @@ int main(int argc,char **argv)
     usage();
     abort();
   }
-  
+
   /* try to open the given file and determine its type from the first few bytes */
   f=fopen(argv[1],"rb");
   if (f==NULL) {
     printf("Input file %s not found.\n",argv[1]);
     abort();
   }
-  
+
   fseek(f,0,SEEK_END);
   inlen=ftell(f);
   rewind(f);
@@ -1849,9 +1850,9 @@ int main(int argc,char **argv)
   inbuf=malloc(inlen+2048); /* safety margin */
   if (inbuf==NULL) { printf("Insufficient memory.\n"); abort(); }
   if (fread(inbuf,1,inlen,f)!=(size_t)inlen)
-    { printf("File read error.\n"); abort(); }
+    { printf("File read error.\n"); fclose(f); free(inbuf); abort(); }
   fclose(f);
-  
+
   iscompr=0;
   if (((inbuf[0]&0xfe)==0x10)&&(inbuf[1]==0xfb)) {
     /* this is a compressed QFS file */
@@ -1861,11 +1862,11 @@ int main(int argc,char **argv)
     free(inbuf);
     inbuf=tmpbuf;
   }
-  
-  if (!strncmp(inbuf,"SHPI",4)) {  
+
+  if (!strncmp(inbuf,"SHPI",4)) {
     /* this is a FSH file */
     printf("FSH data (%d bytes).\n",inlen);
-    
+
     /* find a target directory name */
     if (argv[2]!=NULL)
       outfn=strdup(argv[2]);
@@ -1875,6 +1876,7 @@ int main(int argc,char **argv)
       if (outfn[i]!='.') {
         printf("Don't know how to derive a directory name from '%s'\n",outfn);
         printf("Please specify a second command-line argument.\n");
+        free(inbuf);
         abort();
       }
       outfn[i]=0;
@@ -1882,39 +1884,39 @@ int main(int argc,char **argv)
     rmdir(outfn);
     if (mkdir(outfn,0777)!=0) {
       printf("The directory '%s' is not empty or cannot be created.\n",outfn);
-      printf("Choose one of the following and press Enter: \n");
-      printf("  1. Overwrite files in that directory.\n");
-      printf("  2. Derive an alternate directory name.\n");
+/*       printf("Choose one of the following and press Enter: \n");
+      printf("  1. Overwrite files in that directory.\n"); */
+/*       printf("  2. Derive an alternate directory name.\n");
       printf("  3. Abort execution <default>.\n");
       printf("\n(If the source file is located on a CD-ROM or read-only drive, please\n");
-      printf("choose '3', move the file to your hard disk, and re-run FSHTOOL)\n");
-      printf("\nYour choice [1-3]: ");
+      printf("choose '3', move the file to your hard disk, and re-run FSHTOOL)\n"); */
+      /* printf("\nYour choice [1-3]: 1"); */
       fflush(stdout);
-      choice=getchar();
-      if ((choice!='1')&&(choice!='2')) {
+      /* choice=1;getchar(); */
+      /* if ((choice!='1')&&(choice!='2')) {
         printf("Aborting.\n"); abort();
       }
       if (choice=='2') {
         printf("Deriving alternate directory names...\n");
         i=strlen(outfn);
         outfn[i]='.'; outfn[i+2]=0;
-        for (j=1;j<=9;j++) { 
+        for (j=1;j<=9;j++) {
           outfn[i+1]='0'+j;
           rmdir(outfn);
           if (mkdir(outfn,0777)==0) break;
         }
         if (j==10) outfn[i]=0;
-      }
+      } */
     }
-    if ((j==10)&&(choice=='2')) {
+    /* if ((j==10)&&(choice=='2')) {
       printf("\nCould not create any of the derived directories.\n");
       printf("Target path might be located on a read-only disk.\n");
       if (argv[2]==NULL) printf("Please specify a second command-line argument.\n");
       abort();
-    }
+    } */
     printf("Unpacking to directory %s\n",outfn);
-    if (chdir(outfn)!=0) { printf("Unable to access directory.\n"); abort(); }
-    
+    if (chdir(outfn)!=0) { printf("Unable to access directory.\n"); free(inbuf); abort(); }
+
     fsh_to_bmp(argv[1]);
   }
 
@@ -1934,9 +1936,9 @@ int main(int argc,char **argv)
     *p=0;
     if (*outfn)
       if (chdir(outfn)!=0)
-        { printf("Unable to access directory.\n"); abort(); }
+        { printf("Unable to access directory.\n"); free(outfn); abort(); }
     free(outfn);
-    
+
     tmpbuf=bmp_to_fsh();
     free(inbuf);
     inbuf=tmpbuf;
@@ -1950,13 +1952,13 @@ int main(int argc,char **argv)
       inbuf=tmpbuf;
       printf("\nGot %d bytes.\n",fshlen);
     }
-    
+
     /* now obtain an output file if rel. to bmp dir */
     if (argv[2]==NULL) {
       printf("Writing to %s\n",fshname);
       chdir("..");
       f=fopen(fshname,"wb");
-      if (f==NULL) { 
+      if (f==NULL) {
         printf("Cannot create output file.\n");
         p=fshname+strlen(fshname);
         while ((p!=fshname)&&(*p!='/')&&(*p!='\\')) p--;
@@ -1966,13 +1968,13 @@ int main(int argc,char **argv)
         if (f==NULL) { printf("Cannot create output file.\n"); abort(); }
       }
     }
-    
-    if (fwrite(inbuf,1,fshlen,f)!=(size_t)fshlen) { printf("File write error ?\n"); abort(); }
+
+    if (fwrite(inbuf,1,fshlen,f)!=(size_t)fshlen) { printf("File write error ?\n"); fclose(f); abort(); }
     fclose(f);
   }
   else { printf("Unknown file format.\n"); abort(); }
 
   printf("Conversion performed successfully.\n");
-  printf("Press Enter to exit.\n"); getchar();
+/*  printf("Press Enter to exit.\n"); getchar();*/
   return 1;
 }
