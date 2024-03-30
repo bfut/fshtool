@@ -56,6 +56,7 @@
 #define rmdir _rmdir
 #define mkdir(a,b) _mkdir(a)
 #define chdir _chdir
+#define strdup _strdup
 #endif
 
 /* QFS compression quality factor */

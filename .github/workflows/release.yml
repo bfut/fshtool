@@ -8,7 +8,6 @@ env:
   dotversion: 1.22
   SRC: fshtool.c
   DEST: fshtool
-  BRANCHES: -DUVTVUTF8
 
 jobs:
   win32:
@@ -16,7 +15,7 @@ jobs:
 
     name: Compile (Windows x86)
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install compiler
         run: |
@@ -24,7 +23,7 @@ jobs:
 
       - name: Build
         run: |
-          MINGWFLAGS='-std=c89 -fPIE -O0 -Xlinker --no-insert-timestamp'
+          MINGWFLAGS='-std=c89 -O0 -Xlinker --no-insert-timestamp'
           # MINGWFLAGS='-std=c89 -fPIE -fstack-clash-protection -s -O2 -Xlinker --no-insert-timestamp'
 
           echo "mingw-win32"
@@ -41,7 +40,7 @@ jobs:
           fshtool.c
 
       - name: Store archive
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "${{ env.DEST }}_noprompt.zip"
           path: "${{ env.DEST }}_noprompt.zip"
